@@ -1,0 +1,22 @@
+[project]
+name = "career-scraper"
+version = "0.1.0"
+description = "Job listing scrapers for major tech companies"
+requires-python = ">=3.11"
+dependencies = [
+    "playwright>=1.40",
+    "boto3>=1.34",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+]
+
+[project.scripts]
+scrape-jobs = "career_scraper.cli:main"
+career-api = "career_scraper.api:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

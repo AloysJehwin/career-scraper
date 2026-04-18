@@ -1,0 +1,62 @@
+name: Scrape Jobs
+
+on:
+  schedule:
+    # Run at 3:15 AM UTC (8:45 AM IST) — 30 min before job-alert Lambda
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+    inputs:
+      company:
+        description: "Company to scrape (or 'all' for every company)"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - all
+          - microsoft
+          - google
+          - amazon
+          - apple
+          - meta
+          - sap
+          - oracle
+          - visa
+          - salesforce
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        company: [microsoft, google, amazon, apple, meta, sap, oracle, visa, salesforce]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -e .
+          playwright install chromium --with-deps
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Scrape ${{ matrix.company }} jobs
+        if: >-
+          github.event_name == 'schedule' ||
+          github.event.inputs.company == 'all' ||
+          github.event.inputs.company == matrix.company
+        run: scrape-jobs --company ${{ matrix.company }}
+        env:
+          JOB_LOCATION: "Bangalore, Karnataka, India"
+          JOBS_S3_BUCKET: dashboard-static-assets-708835965056
+        timeout-minutes: 10
