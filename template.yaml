@@ -7,12 +7,16 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Bearer token for API authentication
+  ImageUri:
+    Type: String
+    Description: ECR image URI for the Lambda function
 
 Resources:
   CareerApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       PackageType: Image
+      ImageUri: !Ref ImageUri
       MemorySize: 256
       Timeout: 30
       Architectures:
@@ -26,9 +30,6 @@ Resources:
             BucketName: dashboard-static-assets-708835965056
       FunctionUrlConfig:
         AuthType: NONE
-    Metadata:
-      Dockerfile: Dockerfile.lambda
-      DockerContext: .
 
 Outputs:
   CareerApiUrl:

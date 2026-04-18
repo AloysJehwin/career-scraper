@@ -2,7 +2,7 @@ name: Deploy Career API
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - "src/career_scraper/api.py"
       - "src/career_scraper/lambda_handler.py"
@@ -13,6 +13,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
+  ECR_REGISTRY: 708835965056.dkr.ecr.us-east-1.amazonaws.com
   ECR_REPO: career-api
 
 jobs:
@@ -30,13 +31,11 @@ jobs:
       - uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
-        env:
-          ECR_REGISTRY: 708835965056.dkr.ecr.us-east-1.amazonaws.com
-          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -f Dockerfile.lambda -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
-          docker tag $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPO:latest
+          IMAGE_URI=$ECR_REGISTRY/$ECR_REPO:${{ github.sha }}
+          docker build -f Dockerfile.lambda -t $IMAGE_URI .
+          docker push $IMAGE_URI
+          docker tag $IMAGE_URI $ECR_REGISTRY/$ECR_REPO:latest
           docker push $ECR_REGISTRY/$ECR_REPO:latest
 
       - name: Install SAM CLI
@@ -50,7 +49,8 @@ jobs:
             --template-file template.yaml \
             --stack-name career-api \
             --capabilities CAPABILITY_IAM \
-            --image-repository 708835965056.dkr.ecr.us-east-1.amazonaws.com/$ECR_REPO \
-            --parameter-overrides ApiToken=${{ secrets.CAREER_API_TOKEN }} \
             --no-confirm-changeset \
-            --no-fail-on-empty-changeset
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              ApiToken=${{ secrets.CAREER_API_TOKEN }} \
+              ImageUri=$ECR_REGISTRY/$ECR_REPO:${{ github.sha }}
