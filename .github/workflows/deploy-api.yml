@@ -47,8 +47,8 @@ jobs:
             --stack-name "$STACK_NAME" \
             --capabilities CAPABILITY_IAM \
             --parameter-overrides \
-              ApiToken=${{ secrets.CAREER_API_TOKEN }} \
               ImageUri="$IMAGE_URI" \
+              ApiToken=${{ secrets.CAREER_API_TOKEN }} \
             --no-fail-on-empty-changeset
 
       - name: Print Function URL

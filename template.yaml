@@ -1,16 +1,18 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Career Scraper API — Lambda + Function URL
+Description: Career Scraper API — Lambda + API Gateway with API Key
 
 Parameters:
-  ApiToken:
-    Type: String
-    NoEcho: true
-    Description: Bearer token for API authentication
   ImageUri:
     Type: String
     Description: ECR image URI for the Lambda function
+  ApiToken:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Bearer token for API authentication (optional)
 
 Resources:
+  # --- Lambda ---
   CareerApiFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -50,21 +52,44 @@ Resources:
           JOBS_S3_BUCKET: dashboard-static-assets-708835965056
           API_TOKEN: !Ref ApiToken
 
-  CareerApiFunctionUrl:
-    Type: AWS::Lambda::Url
-    Properties:
-      AuthType: NONE
-      TargetFunctionArn: !GetAtt CareerApiFunction.Arn
-
-  CareerApiFunctionUrlPermission:
+  CareerApiPermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref CareerApiFunction
-      Action: lambda:InvokeFunctionUrl
-      Principal: "*"
-      FunctionUrlAuthType: NONE
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${CareerApi}/*"
+
+  # --- API Gateway ---
+  CareerApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: career-api
+      ProtocolType: HTTP
+
+  CareerApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref CareerApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt CareerApiFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  CareerApiDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref CareerApi
+      RouteKey: "$default"
+      Target: !Sub "integrations/${CareerApiIntegration}"
+
+  CareerApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref CareerApi
+      StageName: "$default"
+      AutoDeploy: true
 
 Outputs:
   CareerApiUrl:
-    Description: Function URL for the Career API
-    Value: !GetAtt CareerApiFunctionUrl.FunctionUrl
+    Description: API Gateway URL for the Career API
+    Value: !GetAtt CareerApi.ApiEndpoint
