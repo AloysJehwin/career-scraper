@@ -1,5 +1,4 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Transform: AWS::Serverless-2016-10-31
 Description: Career Scraper API — Lambda + Function URL
 
 Parameters:
@@ -12,24 +11,58 @@ Parameters:
     Description: ECR image URI for the Lambda function
 
 Resources:
-  CareerApiFunction:
-    Type: AWS::Serverless::Function
+  CareerApiFunctionRole:
+    Type: AWS::IAM::Role
     Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3ReadJobs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: arn:aws:s3:::dashboard-static-assets-708835965056/jobs/*
+
+  CareerApiFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: career-api
       PackageType: Image
-      ImageUri: !Ref ImageUri
+      Code:
+        ImageUri: !Ref ImageUri
       MemorySize: 256
       Timeout: 30
       Architectures:
         - x86_64
+      Role: !GetAtt CareerApiFunctionRole.Arn
       Environment:
         Variables:
           JOBS_S3_BUCKET: dashboard-static-assets-708835965056
           API_TOKEN: !Ref ApiToken
-      Policies:
-        - S3ReadPolicy:
-            BucketName: dashboard-static-assets-708835965056
-      FunctionUrlConfig:
-        AuthType: NONE
+
+  CareerApiFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      AuthType: NONE
+      TargetFunctionArn: !GetAtt CareerApiFunction.Arn
+
+  CareerApiFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CareerApiFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
 
 Outputs:
   CareerApiUrl:
