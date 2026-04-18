@@ -5,12 +5,34 @@ import os
 from time import time
 
 import boto3
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from career_scraper.scrapers import SCRAPERS
+API_TOKEN = os.environ.get("API_TOKEN", "")
+_bearer = HTTPBearer(auto_error=False)
 
-app = FastAPI(title="Career Scraper API", version="0.1.0")
+
+async def _verify_token(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+):
+    if request.url.path == "/health":
+        return
+    if not API_TOKEN:
+        return
+    if not credentials or credentials.credentials != API_TOKEN:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing API token",
+        )
+
+
+app = FastAPI(
+    title="Career Scraper API",
+    version="0.1.0",
+    dependencies=[Depends(_verify_token)],
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,7 +47,10 @@ app.add_middleware(
 S3_BUCKET = os.environ.get("JOBS_S3_BUCKET", "dashboard-static-assets-708835965056")
 S3_REGION = os.environ.get("AWS_REGION", "us-east-1")
 CACHE_TTL = int(os.environ.get("CACHE_TTL_SECONDS", "300"))
-VALID_COMPANIES = list(SCRAPERS.keys())
+VALID_COMPANIES = [
+    "microsoft", "google", "amazon", "apple", "meta",
+    "sap", "oracle", "visa", "salesforce",
+]
 
 _cache: dict[str, tuple[float, dict]] = {}
 _s3 = None

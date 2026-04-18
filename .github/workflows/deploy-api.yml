@@ -1,0 +1,56 @@
+name: Deploy Career API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/career_scraper/api.py"
+      - "src/career_scraper/lambda_handler.py"
+      - "Dockerfile.lambda"
+      - "template.yaml"
+      - ".github/workflows/deploy-api.yml"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO: career-api
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: 708835965056.dkr.ecr.us-east-1.amazonaws.com
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -f Dockerfile.lambda -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPO:latest
+          docker push $ECR_REGISTRY/$ECR_REPO:latest
+
+      - name: Install SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Deploy with SAM
+        run: |
+          sam deploy \
+            --template-file template.yaml \
+            --stack-name career-api \
+            --capabilities CAPABILITY_IAM \
+            --image-repository 708835965056.dkr.ecr.us-east-1.amazonaws.com/$ECR_REPO \
+            --parameter-overrides ApiToken=${{ secrets.CAREER_API_TOKEN }} \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset

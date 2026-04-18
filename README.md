@@ -49,6 +49,48 @@ career-api
 | `AWS_REGION` | `us-east-1` | AWS region |
 | `PORT` | `8000` | API server port |
 | `CACHE_TTL_SECONDS` | `300` | S3 cache TTL for API responses |
+| `API_TOKEN` | _(empty)_ | Bearer token for API auth (empty = auth disabled) |
+
+## Lambda Deployment
+
+The API can be deployed to AWS Lambda with a Function URL using SAM.
+
+### Prerequisites
+
+```bash
+# Create ECR repository (one-time)
+aws ecr create-repository --repository-name career-api --region us-east-1
+
+# Generate an API token
+openssl rand -hex 32
+```
+
+### Deploy
+
+```bash
+# Build and push the container image
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 708835965056.dkr.ecr.us-east-1.amazonaws.com
+docker build -f Dockerfile.lambda -t 708835965056.dkr.ecr.us-east-1.amazonaws.com/career-api:latest .
+docker push 708835965056.dkr.ecr.us-east-1.amazonaws.com/career-api:latest
+
+# Deploy with SAM
+sam deploy \
+  --template-file template.yaml \
+  --stack-name career-api \
+  --capabilities CAPABILITY_IAM \
+  --image-repository 708835965056.dkr.ecr.us-east-1.amazonaws.com/career-api \
+  --parameter-overrides ApiToken=<your-token>
+```
+
+The Function URL is printed in the stack outputs. CI/CD runs automatically via `.github/workflows/deploy-api.yml` on pushes to main.
+
+### Authentication
+
+All endpoints except `/health` require a Bearer token:
+
+```bash
+curl -H "Authorization: Bearer <token>" https://<function-url>/jobs/microsoft
+```
 
 ## Docker
 
